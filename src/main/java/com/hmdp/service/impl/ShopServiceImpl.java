@@ -1,5 +1,6 @@
 package com.hmdp.service.impl;
 
+import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.hmdp.dto.Result;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongFunction;
 
 /**
  * <p>
@@ -27,6 +29,18 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     @Override
     public Result queryById(Long id){
+        //缓存穿透
+//        Shop shop=queryWithPassThrough(id);
+        //互斥锁解决缓存击穿
+        Shop shop=queryWithMutex(id);
+        if(shop==null){
+            return Result.fail("店铺不存在");
+        }
+        //返回
+        return Result.ok(shop);
+    }
+
+    public Shop queryWithMutex(Long id){
         String key=RedisConstants.CACHE_SHOP_KEY +id;
         //从redis查询商品缓存
         String shopJson=stringRedisTemplate.opsForValue().get(key);
@@ -34,25 +48,54 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         if(StrUtil.isNotBlank(shopJson)){
             //存在-->返回
             Shop shop= JSONUtil.toBean(shopJson,Shop.class);
-            return Result.ok(shop);
+            return shop;
         }
         //判断命中的是否是空值
         if(shopJson!=null){
-            return Result.fail("店铺信息不存在");
+            return null;
         }
-        //不存在-->根据id查询数据库
-        Shop shop=getById(id);
-        //不存在-->返回错误
-        if (shop == null) {
-            //将空值写入redis
-            stringRedisTemplate.opsForValue().set(key,JSONUtil.toJsonStr(shop),RedisConstants.CACHE_NULL_TTL,TimeUnit.MINUTES);
+        //实现缓存重建
+        //1.获取互斥锁
+        String lockKey = RedisConstants.LOCK_SHOP_KEY + id;
+        boolean isLock = tryLock(lockKey);
+        Shop shop;
+        try {
 
-            return Result.fail("店铺不存在");
+            //2.判断是否获取成功
+            if (!isLock) {
+                //3.失败并重试
+                Thread.sleep(200);
+                return queryWithMutex(id);
+            }
+            //4.获取锁成功，根据id查询数据库
+            shop = getById(id);
+            //不存在-->返回错误
+            if (shop == null) {
+                //将空值写入redis
+                stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(shop), RedisConstants.CACHE_NULL_TTL, TimeUnit.MINUTES);
+
+                return null;
+            }
+            //存在-->写入redis
+            stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(shop), RedisConstants.CACHE_SHOP_TTL, TimeUnit.MINUTES);
+        }catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }finally {
+            //释放锁
+            unlock(lockKey);
         }
-        //存在-->写入redis
-        stringRedisTemplate.opsForValue().set(key,JSONUtil.toJsonStr(shop),RedisConstants.CACHE_SHOP_TTL,TimeUnit.MINUTES);
+
         //返回
-        return Result.ok(shop);
+        return shop;
+    }
+
+    private boolean tryLock(String key){
+        Boolean flag =stringRedisTemplate.opsForValue().setIfAbsent(key,"1",10,TimeUnit.SECONDS);
+        return BooleanUtil.isTrue(flag);
+    }
+
+    private void unlock(String key){
+        stringRedisTemplate.delete(key);
     }
 
 //    @Override
