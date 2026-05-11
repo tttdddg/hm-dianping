@@ -1,8 +1,14 @@
 package com.hmdp.utils;
 
+import lombok.Builder;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
+
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import cn.hutool.core.lang.UUID;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.support.collections.DefaultRedisList;
 
 public class SimpleRedisLock implements Ilock{
     private String name;
@@ -14,6 +20,12 @@ public class SimpleRedisLock implements Ilock{
     }
     private static final String KEY_PREFIX= "lock:";
     private static final String ID_PREFIX=UUID.randomUUID().toString(true)+"-";
+    private static final DefaultRedisScript<Long> UNLOCK_SCRIPT;
+    static{
+        UNLOCK_SCRIPT=new DefaultRedisScript<>();
+        UNLOCK_SCRIPT.setLocation(new ClassPathResource("unlock.lua"));
+        UNLOCK_SCRIPT.setResultType(Long.class);
+    }
 
     @Override
     public boolean tryLock(long timeoutSec) {
@@ -27,13 +39,22 @@ public class SimpleRedisLock implements Ilock{
 
     @Override
     public void unLock() {
-        //获取线程标示
-        String threadId=ID_PREFIX+Thread.currentThread().getId();
-        //获取锁中标示
-        String id=stringRedisTemplate.opsForValue().get(KEY_PREFIX+name);
-        if(threadId.equals(id)){
-            //释放锁
-            stringRedisTemplate.delete(KEY_PREFIX+name);
-        }
+        //调用lua脚本
+        stringRedisTemplate.execute(
+                UNLOCK_SCRIPT,
+                Collections.singletonList(KEY_PREFIX+name),
+                ID_PREFIX+Thread.currentThread().getId()
+        );
     }
+//    @Override
+//    public void unLock() {
+//        //获取线程标示
+//        String threadId=ID_PREFIX+Thread.currentThread().getId();
+//        //获取锁中标示
+//        String id=stringRedisTemplate.opsForValue().get(KEY_PREFIX+name);
+//        if(threadId.equals(id)){
+//            //释放锁
+//            stringRedisTemplate.delete(KEY_PREFIX+name);
+//        }
+//    }
 }
