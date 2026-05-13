@@ -1,9 +1,30 @@
-##### 黑马点评（基础篇+实战篇）-后端学习项目
+### 黑马点评（基础篇+实战篇）-后端学习项目
 应用：社交类项目         eg：电商、大众点评
 
-Redis就是一个工具，学习时不用太深究里面难的技术（很难），重点是知道Redis能解决什么问题：怎么使用Redis来加快数据传输、处理并发问题
+Redis就是一个工具，学习时不用太深究里面难的技术（很难）
 
-#####  第一阶段：项目基础 &环境搭建    
+，重点是知道Redis能解决什么问题：怎么使用Redis来加快数据传输、处理并发问题
+
+
+
+必看（核心）
+
+- 登录模块（Redis token）
+- 商铺缓存（三大问题）
+- 秒杀系统（Lua + 一人一单）
+
+次重点
+
+- 分布式锁
+- GEO / ZSet（二选一）
+
+可跳
+
+- 前端
+- 基础 CRUD
+- Bitmap
+
+#####  第一阶段：项目基础 &环境搭建    √
 
 对应视频：
 
@@ -17,7 +38,7 @@ Redis就是一个工具，学习时不用太深究里面难的技术（很难）
 
 ------
 
-##### 第二阶段：用户登录模块（Redis入门） 
+##### 第二阶段：用户登录模块（Redis入门）**√**
 
 对应视频：
 
@@ -34,7 +55,7 @@ Redis就是一个工具，学习时不用太深究里面难的技术（很难）
 
 ------
 
-##### 第三阶段：商铺查询（缓存核心）  
+##### 第三阶段：商铺查询（缓存核心）  √
 
 对应视频：
 
@@ -51,7 +72,7 @@ Redis就是一个工具，学习时不用太深究里面难的技术（很难）
 
 ------
 
-##### 第四阶段：附近商户（Redis GEO）
+##### 第四阶段：附近商户（Redis GEO）  √
 
 对应视频：
 
@@ -62,7 +83,7 @@ Redis就是一个工具，学习时不用太深究里面难的技术（很难）
 
 ------
 
-##### 第五阶段：点赞 / 排行榜（ZSet）
+##### 第五阶段：点赞 / 排行榜（ZSet）  √
 
 对应视频：
 
@@ -77,7 +98,7 @@ Redis就是一个工具，学习时不用太深究里面难的技术（很难）
 
 ------
 
-##### 第六阶段：签到（Bitmap）
+##### 第六阶段：签到（Bitmap）  √
 
 对应视频：
 
@@ -92,7 +113,7 @@ Redis就是一个工具，学习时不用太深究里面难的技术（很难）
 
 ------
 
-##### 第七阶段：秒杀系统（最重要之一）
+##### 第七阶段：秒杀系统（最重要之一）  √
 
 对应视频：
 
@@ -111,7 +132,7 @@ Redis就是一个工具，学习时不用太深究里面难的技术（很难）
 
 ------
 
-##### 第八阶段：分布式锁
+##### 第八阶段：分布式锁   √
 
 对应视频：
 
@@ -248,8 +269,125 @@ Redis就是一个工具，学习时不用太深究里面难的技术（很难）
 
 ​	Redisson：
 
-​		优点：
-
 ![image-20260508104010767](C:\Users\20914\AppData\Roaming\Typora\typora-user-images\image-20260508104010767.png)
 
-​			可重入锁原理：同一线程已持有锁时，再次加锁不用阻塞，直接成功；释放时次数递减，减到 0 才真正删锁
+​			优点：
+
+​					可重入锁原理：利用hash结构记录线程id和重入次数，同一线程已持有锁时，再次加锁不用阻塞，直接成功；释放时次数递减，减到 0 才真正删锁
+
+​					可重试：利用信号量和PubSub功能实现等待、唤醒，获取锁失败的重试机制
+
+​					超时续约：利用watchDog,每隔一段时间(releaseTime/3),重置超时时间
+
+​					主从一致性：利用multiLock,多个独立的Redis节点，必须在所有节点都获取重入锁，才算获取锁成功
+
+​		秒杀业务优化：
+
+​						异步优化：基于redis完成秒杀资格判断（库存余量、一人一单）
+
+​										   基于阻塞队列实现秒杀异步优化（放入阻塞队列，独立线程异步下单）
+
+​					    -->内存安全问题、数据限制问题
+
+![image-20260511214258215](C:\Users\20914\AppData\Roaming\Typora\typora-user-images\image-20260511214258215.png)
+
+![image-20260511215155926](C:\Users\20914\AppData\Roaming\Typora\typora-user-images\image-20260511215155926.png)
+
+​		消息队列：
+
+![image-20260512160641493](C:\Users\20914\AppData\Roaming\Typora\typora-user-images\image-20260512160641493.png)
+
+​			Redis提供了三种不同的方式来实现消息队列：
+
+![image-20260513185447631](C:\Users\20914\AppData\Roaming\Typora\typora-user-images\image-20260513185447631.png)
+
+​					list结构：基于List结构（双向链表）模拟消息队列
+
+​									 LPUSH+RPOP / RPUSH+LPOP
+
+​									 xPOP：无消息时会返回null--> BxPOP来阻塞
+
+![image-20260512161411233](C:\Users\20914\AppData\Roaming\Typora\typora-user-images\image-20260512161411233.png)
+
+​					PubSub（发布订阅）：基本的点对点消息模型
+
+![image-20260512161630678](C:\Users\20914\AppData\Roaming\Typora\typora-user-images\image-20260512161630678.png)
+
+![image-20260512162058877](C:\Users\20914\AppData\Roaming\Typora\typora-user-images\image-20260512162058877.png)					
+
+​						Stream：比较完善的消息队列模型 √
+
+​										单消息模式：读取消息方式：XREAD
+
+![image-20260512163210994](C:\Users\20914\AppData\Roaming\Typora\typora-user-images\image-20260512163210994.png)
+
+​										 消费者组模式：把多个消费者划分到一个组中监听同一个队列
+
+​								  （Consumer Group）
+
+![image-20260513185352099](C:\Users\20914\AppData\Roaming\Typora\typora-user-images\image-20260513185352099.png)
+
+
+
+##### 4.达人探店：
+
+- 发布笔记（存储照片）
+- 查看笔记
+- 点赞功能（用set集合存储已经点赞的用户ID，新增IsLike字段标识是否点赞）
+- 点赞排行榜功能（改用SortedSet存储用户ID，score值设置为点赞时间，最后根据点赞时间排序）
+
+
+
+##### 5.好友关注：
+
+- 关注和取关：有个tb_follow表，存储关注和被关注的人的id
+- 共同关注：在更新数据库的同时，将用户关注的id记录到Redis的Set集合中；新增查询目标用户的共同关注接口，求两个用户的Set集合的交集，即为共同关注
+- 关注推送：Feed流
+
+
+
+##### 6.附近商铺：
+
+- 存储方案设计：按照商户类型做分组，类型相同的商户作为同一组，以typeld为key存入同一个GEO集合中即可（在店铺新增存人的时候，就提前用key分好组）
+
+​	查询店铺的时候看需不需要按距离排序，需要的话就调用GEO来计算，不需要就直接呈现所有店铺
+
+
+
+##### 7.用户签到：
+
+​	Redis将BitMap的所有操作封装到字符串String中了，因此spring-data-redis使用opsForValue,操作BitMap
+
+```Plain
+stringRedisTemplate_opsForValue（).setBit key, dayOfMonth -1, true)1 stringRedisTemplate.opsForValue().setBit(key,dayofMonth-1,true);
+```
+
+- key:哪个用户
+- dayOfMonth:哪一天
+- true:签到
+
+
+
+##### 8.UV统计：
+
+UV：全称Unique visitor，也叫独立访客量，是指通过互联网访问、浏览这个网页的自然人。1天内同一个用户多次UV:全称Unique Visitor,也叫独立访客量，是指通过互联网访问、浏览这个网页的自然人。1天内同一个用户多次访问该网站，只记录1次。
+
+PV：全称PageView，也叫页面访问量或点击量，用户每访问网站的一个页面，记录1次PV，用户多次打开页面，PV:全称Page View,也叫页面访问量或点击量，用户每访问网站的一个页面，记录1次PV,用户多次打开页面，则记录多次PV。往往用来衡量网站的流量。
+
+```java
+@Test
+void testHyperLogLog() {
+    String[] values = new String[1000];
+    for (int i = 0; i < 1000000; i++) {
+        values[i % 1000] = "user_" + i;
+        // 每1000次，添加一次，添加到Redis
+        if (i % 1000 == 999) {
+            stringRedisTemplate.opsForHyperLogLog().add("hl2", values);
+        }
+    }
+    // 统计数量
+    Long count = stringRedisTemplate.opsForHyperLogLog().size("hl2");
+    System.out.println("count = " + count); // count = 997593
+}
+```
+
