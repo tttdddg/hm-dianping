@@ -17,5 +17,8 @@ end
 
 --扣库存
 redis.call('incrby', stocKey, -1)
+--下单（保存用户）
 redis.call('sadd', orderKey, userId)
-
+--发送消息队列中
+redis.call('xadd', 'stream.orders', '*', 'userId', userId, 'voucherId', voucherId,'id', orderId)
+return 0
